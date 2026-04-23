@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Workout log</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen pb-20">
+    <div class="max-w-md mx-auto p-4">
+        
+        <div class="bg-white rounded-2xl shadow-sm p-4 mb-4 border-b-4 border-blue-500">
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">表示中の日付</label>
+            <input type="date" id="datePicker" onchange="displayLogs()" class="text-xl font-bold text-slate-800 w-full outline-none cursor-pointer">
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-xs font-bold text-slate-400 mb-2 px-1">よく使う種目を追加 (タップで追加)</label>
+            <div id="exerciseSelectArea" class="flex flex-wrap gap-2">
+                </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-4 mb-6 border border-slate-200 flex gap-2">
+            <input type="text" id="manualMenu" placeholder="その他の種目を入力" class="flex-1 border-slate-200 rounded-lg p-2 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-400 text-sm">
+            <button onclick="addLog(document.getElementById('manualMenu').value); document.getElementById('manualMenu').value='';" class="bg-slate-800 text-white font-bold px-4 rounded-lg text-sm active:scale-95 transition">
+                追加
+            </button>
+        </div>
+
+        <div id="logContainer" class="space-y-3 mb-10"></div>
+
+        <hr class="my-8 border-slate-300">
+
+        <div class="bg-slate-200 rounded-2xl p-5">
+            <h2 class="text-lg font-bold text-slate-800 mb-4">種目の登録・管理</h2>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="newExercise" placeholder="例：ベンチプレス" class="flex-1 border-slate-300 rounded-lg p-2 outline-none text-sm">
+                <button onclick="saveExercise()" class="bg-blue-600 text-white font-bold px-4 rounded-lg text-sm">
+                    登録
+                </button>
+            </div>
+            <div id="exerciseList" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('datePicker').valueAsDate = new Date();
+        window.onload = () => {
+            displayLogs();
+            displayExercises();
+        };
+
+        // --- 記録（ログ）機能 ---
+        function addLog(menu) {
+            if (!menu.trim()) return;
+
+            const date = document.getElementById('datePicker').value;
+            const logs = JSON.parse(localStorage.getItem('workoutLogs')) || [];
+            
+            // 追加時は重量と回数は空（または前回値）にしておき、後から入力させる
+            logs.push({ id: Date.now() + Math.random(), date, menu, weight: '', reps: '' });
+            localStorage.setItem('workoutLogs', JSON.stringify(logs));
+            
+            displayLogs();
+        }
+
+        // 直接入力された内容を裏側で自動保存する機能
+        function updateLog(id, field, value) {
+            let logs = JSON.parse(localStorage.getItem('workoutLogs')) || [];
+            let index = logs.findIndex(log => log.id === id);
+            if (index !== -1) {
+                logs[index][field] = value;
+                localStorage.setItem('workoutLogs', JSON.stringify(logs));
+            }
+        }
+
+        function deleteLog(id) {
+            let logs = JSON.parse(localStorage.getItem('workoutLogs')) || [];
+            logs = logs.filter(log => log.id !== id);
+            localStorage.setItem('workoutLogs', JSON.stringify(logs));
+            displayLogs();
+        }
+
+        function duplicateLog(id) {
+            const logs = JSON.parse(localStorage.getItem('workoutLogs')) || [];
+            const target = logs.find(log => log.id === id);
+            if (target) {
+                logs.push({ ...target, id: Date.now() + Math.random() });
+                localStorage.setItem('workoutLogs', JSON.stringify(logs));
+                displayLogs();
+            }
+        }
+
+        function displayLogs() {
+            const selectedDate = document.getElementById('datePicker').value;
+            const container = document.getElementById('logContainer');
+            const logs = JSON.parse(localStorage.getItem('workoutLogs')) || [];
+            const filteredLogs = logs.filter(log => log.date === selectedDate);
+
+            if (filteredLogs.length === 0) {
+                container.innerHTML = `<p class="text-center text-slate-400 py-10 text-sm">この日の記録はありません</p>`;
+                return;
+            }
+
+            // 重量と回数を input タグにして、変更があったら onchange で updateLog を呼ぶ
+            container.innerHTML = filteredLogs.map(log => `
+                <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col gap-3 border-l-4 border-blue-400">
+                    <div class="flex justify-between items-center">
+                        <div class="font-bold text-slate-800">${log.menu}</div>
+                        <div class="flex gap-2">
+                            <button onclick="duplicateLog(${log.id})" class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg">複製</button>
+                            <button onclick="deleteLog(${log.id})" class="text-xs font-bold text-red-400 bg-red-50 px-3 py-1.5 rounded-lg">削除</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" value="${log.weight}" onchange="updateLog(${log.id}, 'weight', this.value)" placeholder="重量" class="w-24 border border-slate-200 rounded-lg p-2 text-center bg-slate-50 focus:ring-2 focus:ring-blue-400 outline-none">
+                        <span class="text-sm text-slate-500">kg</span>
+                        <span class="text-slate-400 px-1">×</span>
+                        <input type="number" value="${log.reps}" onchange="updateLog(${log.id}, 'reps', this.value)" placeholder="回数" class="w-24 border border-slate-200 rounded-lg p-2 text-center bg-slate-50 focus:ring-2 focus:ring-blue-400 outline-none">
+                        <span class="text-sm text-slate-500">回</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- 種目（プリセット）機能 ---
+        function saveExercise() {
+            const name = document.getElementById('newExercise').value.trim();
+            if (!name) return;
+
+            const exercises = JSON.parse(localStorage.getItem('savedExercises')) || [];
+            exercises.push({ id: Date.now(), name });
+            localStorage.setItem('savedExercises', JSON.stringify(exercises));
+
+            document.getElementById('newExercise').value = '';
+            displayExercises();
+        }
+
+        function deleteExercise(id) {
+            let exercises = JSON.parse(localStorage.getItem('savedExercises')) || [];
+            exercises = exercises.filter(e => e.id !== id);
+            localStorage.setItem('savedExercises', JSON.stringify(exercises));
+            displayExercises();
+        }
+
+        function displayExercises() {
+            const list = document.getElementById('exerciseList');
+            const selectArea = document.getElementById('exerciseSelectArea');
+            const exercises = JSON.parse(localStorage.getItem('savedExercises')) || [];
+
+            // 上部のクイック追加ボタン
+            selectArea.innerHTML = exercises.map(e => `
+                <button onclick="addLog('${e.name}')" class="bg-blue-100 text-blue-700 text-sm font-bold px-4 py-2 rounded-full hover:bg-blue-200 transition active:scale-95 shadow-sm">
+                    ＋ ${e.name}
+                </button>
+            `).join('') || '<p class="text-xs text-slate-400 italic">下にスクロールして種目を登録してください</p>';
+
+            // 下部の管理リスト
+            list.innerHTML = exercises.map(e => `
+                <div class="flex justify-between items-center bg-white p-2 rounded-lg text-sm shadow-sm border border-slate-100">
+                    <span class="font-bold text-slate-700 ml-2">${e.name}</span>
+                    <button onclick="deleteExercise(${e.id})" class="text-red-400 bg-red-50 px-3 py-1 rounded-md text-xs">削除</button>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
